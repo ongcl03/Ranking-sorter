@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Upload Excel File</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin: 0;
+      }
+      #results {
+        margin-top: 20px;
+        text-align: center;
+      }
+
+      .input-file {
+        margin-left: 50px;
+        margin-bottom: 20px;
+      }
+
+      .input-text {
+        margin-bottom: 20px;
+      }
+
+      .download-btn {
+        margin-top: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Rank Sorter</h1>
+    <h3>Upload Excel File</h3>
+    <input class="input-file" type="file" id="excelFile" accept=".xlsx" />
+    <textarea
+      class="input-text"
+      id="namesText"
+      rows="10"
+      cols="30"
+      placeholder="Enter participants"
+    ></textarea>
+    <button onclick="processFile()">Process File</button>
+    <button class="download-btn" id="downloadBtn" disabled>
+      Download Results
+    </button>
+    <div id="results"></div>
+
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>
+    <script>
+      let sorted_data = [];
+
+      function processFile() {
+        const fileInput = document.getElementById("excelFile");
+        const file = fileInput.files[0];
+        if (!file) {
+          alert("Please select a file!");
+          return;
+        }
+
+        // Get the name of the uploaded file, remove the extension, and append "-sorted.txt"
+        const fileName =
+          file.name.split(".").slice(0, -1).join(".") + "-sorted.txt";
+        // Store the filename in a data attribute of the download button
+        document.getElementById("downloadBtn").dataset.fileName = fileName;
+
+        const textArea = document.getElementById("namesText");
+        const text = textArea.value;
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: "array" });
+
+          const sheet_name_list = workbook.SheetNames;
+          const df = XLSX.utils.sheet_to_json(
+            workbook.Sheets[sheet_name_list[0]],
+            { range: 1 }
+          );
+
+          // Get the column names from the first row of df
+          const columnNames = Object.keys(df[0]);
+
+          const lines = text.split("\n");
+          const names_to_sort = lines.map((line) => line.split(")")[1].trim());
+
+          // Filter df to only include rows where the name column is in names_to_sort
+          const filtered_df = df.filter((row) =>
+            names_to_sort.includes(row[columnNames[1]])
+          );
+
+          // Sort filtered_df by the score column in descending order
+          const sorted_df = _.orderBy(filtered_df, [columnNames[3]], ["desc"]);
+
+          // Convert the scores to integers and extract sorted names and their corresponding scores
+          sorted_data = sorted_df.map((row) => [
+            row[columnNames[1]],
+            parseInt(row[columnNames[3]]),
+          ]);
+
+          const resultsDiv = document.getElementById("results");
+          resultsDiv.innerHTML = "";
+          let rank = 1;
+          sorted_data.forEach(([name, score]) => {
+            resultsDiv.innerHTML += `<div>${rank}) ${name} ${score}</div>`;
+            rank++;
+          });
+
+          // Enable the download button
+          document.getElementById("downloadBtn").disabled = false;
+        };
+        reader.readAsArrayBuffer(file);
+      }
+
+      function downloadResults() {
+        if (sorted_data.length === 0) {
+          alert("No data to download. Please process a file first.");
+          return;
+        }
+
+        // Convert sorted_data to a string with tab-separated values
+        const dataStr = sorted_data
+          .map(([name, score]) => `${name}\t${score}`)
+          .join("\n");
+
+        // Create a Blob with the data
+        const blob = new Blob([dataStr], { type: "text/plain;charset=ansi" });
+
+        // Create a link element
+        const link = document.createElement("a");
+
+        // Set the href and download attributes of the link
+        link.href = URL.createObjectURL(blob);
+        // Get the filename from the data attribute of the download button
+        link.download = document.getElementById("downloadBtn").dataset.fileName;
+
+        // Append the link to the body
+        document.body.appendChild(link);
+
+        // Click the link to start the download
+        link.click();
+
+        // Remove the link after the download starts
+        setTimeout(() => document.body.removeChild(link), 100);
+      }
+
+      // Add an event listener to the download button
+      document
+        .getElementById("downloadBtn")
+        .addEventListener("click", downloadResults);
+    </script>
+  </body>
+</html>
