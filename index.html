@@ -120,9 +120,11 @@
         }
 
         // Convert sorted_data to a string with tab-separated values
-        const dataStr = sorted_data
+        let dataStr = sorted_data
           .map(([name, score]) => `${name}\t${score}`)
           .join("\n");
+
+        dataStr = dataStr + "\n";
 
         // Create a Blob with the data
         const blob = new Blob([dataStr], { type: "text/plain;charset=ansi" });
